@@ -1,0 +1,6 @@
+{
+  "name": "Rooftop Parkour: Apex Flow",
+  "description": "High-octane 3D first-person/third-person rooftop parkour game featuring responsive momentum physics, wall-running, vaulting, sliding, grapple hook, speedrun ghost replay, and custom specialist archetypes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

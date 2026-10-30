@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Rooftop Parkour: Apex Flow</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            margin: 0;
+            padding: 0;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0b0e14;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* --- UI OVERLAY --- */
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        /* Top HUD */
+        .top-hud {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 18px 24px;
+        }
+        .badge-box {
+            background: rgba(18, 22, 33, 0.85);
+            border-left: 4px solid #ff9900;
+            border-radius: 6px;
+            padding: 8px 16px;
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+            backdrop-filter: blur(4px);
+        }
+        .badge-label {
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: #ffaa33;
+        }
+        .badge-value {
+            font-size: 20px;
+            font-weight: 900;
+            letter-spacing: 1px;
+        }
+        .center-timer {
+            border-left: 4px solid #00d2ff;
+        }
+        .center-timer .badge-label { color: #00d2ff; }
+
+        /* Character Profile in HUD */
+        .char-tag {
+            background: rgba(18, 22, 33, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            padding: 8px 14px;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .char-tag .role {
+            font-size: 10px;
+            color: #aaa;
+            text-transform: uppercase;
+        }
+        .char-tag .name {
+            font-size: 14px;
+            font-weight: bold;
+            color: #ff9900;
+        }
+
+        /* Mobile Controls HUD */
+        .controls-layer {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            padding: 24px;
+            pointer-events: auto;
+        }
+        /* Virtual Joystick */
+        #joystick-zone {
+            width: 140px;
+            height: 140px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 2px dashed rgba(255, 255, 255, 0.25);
+            border-radius: 50%;
+            position: relative;
+            touch-action: none;
+        }
+        #joystick-knob {
+            width: 54px;
+            height: 54px;
+            background: radial-gradient(circle, #ff9900 20%, #cc6600 100%);
+            border-radius: 50%;
+            position: absolute;
+            top: 43px;
+            left: 43px;
+            box-shadow: 0 0 15px rgba(255, 153, 0, 0.6);
+            pointer-events: none;
+        }
+
+        /* Action Buttons Grid */
+        .action-cluster {
+            display: grid;
+            grid-template-columns: repeat(2, 68px);
+            grid-gap: 16px;
+            transform: rotate(-5deg);
+        }
+        .action-btn {
+            width: 66px;
+            height: 66px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            background: rgba(18, 22, 33, 0.75);
+            backdrop-filter: blur(6px);
+            color: #fff;
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5);
+            cursor: pointer;
+            transition: all 0.1s ease;
+        }
+        .action-btn:active {
+            transform: scale(0.92);
+            background: #ff9900;
+            border-color: #fff;
+            color: #111;
+        }
+        .action-btn.jump-btn {
+            background: rgba(255, 153, 0, 0.25);
+            border-color: #ff9900;
+        }
+
+        /* Trick Combo Toast */
+        #combo-banner {
+            position: absolute;
+            top: 22%;
+            right: 25px;
+            font-size: 16px;
+            font-weight: 900;
+            color: #ffea00;
+            text-shadow: 0 0 10px rgba(255, 234, 0, 0.7);
+            background: rgba(0,0,0,0.6);
+            padding: 8px 14px;
+            border-radius: 4px;
+            transform: skew(-10deg);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        /* Character Select Modal */
+        #select-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(10,12,18,0.95), rgba(28,21,14,0.95));
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .modal-title {
+            color: #fff;
+            font-size: 32px;
+            font-weight: 900;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+            text-align: center;
+        }
+        .modal-sub {
+            color: #ff9900;
+            font-size: 13px;
+            margin-bottom: 25px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        .roster-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            max-width: 950px;
+            width: 100%;
+            margin-bottom: 25px;
+        }
+        .char-card {
+            background: rgba(25, 30, 42, 0.7);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 16px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            transition: all 0.25s ease;
+        }
+        .char-card:hover, .char-card.selected {
+            border-color: #ff9900;
+            transform: translateY(-6px);
+            background: rgba(35, 42, 60, 0.95);
+            box-shadow: 0 10px 25px rgba(255, 153, 0, 0.3);
+        }
+        .char-card .tag-crown {
+            font-size: 18px;
+            color: #ffaa00;
+        }
+        .char-card .char-title {
+            color: #fff;
+            font-size: 17px;
+            font-weight: 800;
+        }
+        .char-card .char-role {
+            font-size: 11px;
+            color: #ff9900;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .char-card .char-desc {
+            font-size: 11px;
+            color: #bbb;
+            line-height: 1.4;
+            min-height: 50px;
+        }
+        .char-stat {
+            font-size: 10px;
+            color: #88c0d0;
+            font-weight: bold;
+        }
+        .start-btn {
+            background: #ff9900;
+            color: #111;
+            padding: 14px 44px;
+            font-size: 18px;
+            font-weight: 900;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 6px 20px rgba(255, 153, 0, 0.5);
+            transition: 0.2s;
+        }
+        .start-btn:hover {
+            transform: scale(1.05);
+            background: #ffaa22;
+        }
+        @media(max-width: 800px) {
+            .roster-grid { grid-template-columns: repeat(2, 1fr); }
+            .modal-title { font-size: 24px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 3D Viewport -->
+    <div id="canvas-container"></div>
+
+    <!-- UI Overlay Screen -->
+    <div id="ui-layer">
+        <!-- Top Statistics -->
+        <div class="top-hud">
+            <div class="badge-box">
+                <div class="badge-label">Checkpoints</div>
+                <div class="badge-value" id="hud-checkpoints">0 / 4</div>
+            </div>
+            <div class="badge-box center-timer">
+                <div class="badge-label">Time</div>
+                <div class="badge-value" id="hud-timer">00:00.0</div>
+            </div>
+            <div class="char-tag">
+                <div>
+                    <div class="role" id="hud-char-role">SCOUT</div>
+                    <div class="name" id="hud-char-name">THE REBEL</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Combo Feedback -->
+        <div id="combo-banner">PARKOUR COMBO: WALL RUN +250</div>
+
+        <!-- Mobile Buttons & Joystick -->
+        <div class="controls-layer">
+            <div id="joystick-zone">
+                <div id="joystick-knob"></div>
+            </div>
+            <div class="action-cluster">
+                <div class="action-btn" id="btn-roll">Roll</div>
+                <div class="action-btn" id="btn-slide">Slide</div>
+                <div class="action-btn" id="btn-wallrun">Wall-Run</div>
+                <div class="action-btn jump-btn" id="btn-jump">Jump</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Character Selection Menu (From Image 7) -->
+    <div id="select-screen">
+        <h1 class="modal-title">Select Parkour Specialist</h1>
+        <p class="modal-sub">Choose your flow & athletic archetype</p>
+
+        <div class="roster-grid">
+            <!-- 1. The Rebel -->
+            <div class="char-card selected" onclick="selectArchetype(0)">
+                <div class="tag-crown">👑</div>
+                <div class="char-title">The Rebel</div>
+                <div class="char-role">(Scout)</div>
+                <div class="char-desc">Observes • Plans • Moves alone • Ultra-high agility & quick wall-hop.</div>
+                <div class="char-stat">SPEED: 10 / 10 | JUMP: 9 / 10</div>
+            </div>
+
+            <!-- 2. The Brawler -->
+            <div class="char-card" onclick="selectArchetype(1)">
+                <div class="tag-crown">👑</div>
+                <div class="char-title">The Brawler</div>
+                <div class="char-role">(Heavy)</div>
+                <div class="char-desc">Protects • Fights • Leads • Heavy impact landings & smash vaulting.</div>
+                <div class="char-stat">SPEED: 7 / 10 | RESILIENCE: 10 / 10</div>
+            </div>
+
+            <!-- 3. The Thinker -->
+            <div class="char-card" onclick="selectArchetype(2)">
+                <div class="tag-crown">👑</div>
+                <div class="char-title">The Thinker</div>
+                <div class="char-role">(Mind)</div>
+                <div class="char-desc">Analyzes • Connects • Solves • Precision trajectory & extended ledge reach.</div>
+                <div class="char-stat">PRECISION: 10 / 10 | CLIMB: 10 / 10</div>
+            </div>
+
+            <!-- 4. The Free Spirit -->
+            <div class="char-card" onclick="selectArchetype(3)">
+                <div class="tag-crown">👑</div>
+                <div class="char-title">The Free Spirit</div>
+                <div class="char-role">(Vibe)</div>
+                <div class="char-desc">Creates • Inspires • Flows • Infinite momentum combos & air spins.</div>
+                <div class="char-stat">FLOW MULTIPLIER: 2.0x | AIR FLIP: 10 / 10</div>
+            </div>
+        </div>
+
+        <button class="start-btn" onclick="startGame()">Start Run</button>
+    </div>
+
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        /* ------------------------------------------------------------------
+           1. CHARACTER PROFILES (Based on Image 7)
+           ------------------------------------------------------------------ */
+        const CHARACTERS = [
+            {
+                name: "THE REBEL",
+                role: "SCOUT",
+                colorBody: 0x1a1a24,
+                colorJacket: 0x111111,
+                colorPants: 0x222226,
+                speedMultiplier: 1.25,
+                jumpPower: 14.5,
+                wallRunBonus: 1.3
+            },
+            {
+                name: "THE BRAWLER",
+                role: "HEAVY",
+                colorBody: 0x2e1a14,
+                colorJacket: 0x1b1f24,
+                colorPants: 0x191a18,
+                speedMultiplier: 0.95,
+                jumpPower: 12.0,
+                wallRunBonus: 0.85
+            },
+            {
+                name: "THE THINKER",
+                role: "MIND",
+                colorBody: 0xd9d9d9,
+                colorJacket: 0xe6e6e6,
+                colorPants: 0x6e6347,
+                speedMultiplier: 1.1,
+                jumpPower: 13.0,
+                wallRunBonus: 1.1
+            },
+            {
+                name: "THE FREE SPIRIT",
+                role: "VIBE",
+                colorBody: 0xcccccc,
+                colorJacket: 0x9fa8a3,
+                colorPants: 0x1a1b20,
+                speedMultiplier: 1.15,
+                jumpPower: 14.0,
+                wallRunBonus: 1.45
+            }
+        ];
+
+        let selectedCharIndex = 0;
+        function selectArchetype(index) {
+            selectedCharIndex = index;
+            document.querySelectorAll('.char-card').forEach((c, i) => {
+                c.classList.toggle('selected', i === index);
+            });
+        }
+
+        /* ------------------------------------------------------------------
+           2. GAME ENGINE SETUP
+           ------------------------------------------------------------------ */
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x84b2d8);
+        scene.fog = new THREE.FogExp2(0x84b2d8, 0.007);
+
+        const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        // Lighting (Golden Hour Rooftop Sky like Screenshots)
+        const hemiLight = new THREE.HemisphereLight(0xffeedd, 0x444455, 0.65);
+        scene.add(hemiLight);
+
+        const dirLight = new THREE.DirectionalLight(0xfffaed, 1.2);
+        dirLight.position.set(100, 160, 60);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
+        dirLight.shadow.camera.near = 10;
+        dirLight.shadow.camera.far = 400;
+        dirLight.shadow.camera.left = -90;
+        dirLight.shadow.camera.right = 90;
+        dirLight.shadow.camera.top = 90;
+        dirLight.shadow.camera.bottom = -90;
+        scene.add(dirLight);
+
+        /* ------------------------------------------------------------------
+           3. ENVIRONMENT GENERATOR (Rooftops, Pipes, Vents, AC Units)
+           ------------------------------------------------------------------ */
+        const obstacles = [];
+        const checkpoints = [];
+        let activeCheckpointIndex = 0;
+
+        function createBuilding(x, z, width, depth, height, roofColor = 0xb56345) {
+            const group = new THREE.Group();
+
+            // Main Concrete Building
+            const bGeo = new THREE.BoxGeometry(width, height, depth);
+            const bMat = new THREE.MeshLambertMaterial({ color: 0x6e7882 });
+            const buildingMesh = new THREE.Mesh(bGeo, bMat);
+            buildingMesh.position.y = height / 2;
+            buildingMesh.castShadow = true;
+            buildingMesh.receiveShadow = true;
+            group.add(buildingMesh);
+
+            // Roof Parapet / Rim
+            const roofGeo = new THREE.BoxGeometry(width + 0.6, 1.2, depth + 0.6);
+            const roofMat = new THREE.MeshLambertMaterial({ color: roofColor });
+            const roofMesh = new THREE.Mesh(roofGeo, roofMat);
+            roofMesh.position.y = height;
+            roofMesh.castShadow = true;
+            roofMesh.receiveShadow = true;
+            group.add(roofMesh);
+
+            group.position.set(x, 0, z);
+            scene.add(group);
+
+            // Bounding collision box for rooftop
+            const topY = height + 0.6;
+            obstacles.push({
+                minX: x - width / 2,
+                maxX: x + width / 2,
+                minZ: z - depth / 2,
+                maxZ: z + depth / 2,
+                topY: topY,
+                isWall: false
+            });
+
+            // AC Units / Obstacles on Rooftops
+            if (Math.random() > 0.3) {
+                const acGeo = new THREE.BoxGeometry(2.5, 1.8, 2.5);
+                const acMat = new THREE.MeshLambertMaterial({ color: 0x9aa2a8 });
+                const ac = new THREE.Mesh(acGeo, acMat);
+                ac.position.set(x + (Math.random() - 0.5) * (width * 0.5), topY + 0.9, z + (Math.random() - 0.5) * (depth * 0.5));
+                ac.castShadow = true;
+                scene.add(ac);
+                obstacles.push({
+                    minX: ac.position.x - 1.25,
+                    maxX: ac.position.x + 1.25,
+                    minZ: ac.position.z - 1.25,
+                    maxZ: ac.position.z + 1.25,
+                    topY: topY + 1.8,
+                    isWall: false
+                });
+            }
+            return topY;
+        }
+
+        // Layout the Parkour Course (From start rooftop to consecutive gap leaps)
+        const course = [
+            { x: 0,   z: 0,   w: 30, d: 35, h: 40 },
+            { x: 0,   z: -48, w: 26, d: 32, h: 42 },
+            { x: -35, z: -85, w: 28, d: 34, h: 46 },
+            { x: 0,   z: -130,w: 32, d: 36, h: 44 }
+        ];
+
+        course.forEach((b, i) => {
+            const topY = createBuilding(b.x, b.z, b.w, b.d, b.h, i % 2 === 0 ? 0x9e5239 : 0x48525e);
+
+            // Checkpoint marker ring
+            const ringGeo = new THREE.TorusGeometry(3.5, 0.4, 16, 50);
+            const ringMat = new THREE.MeshBasicMaterial({ color: 0xffaa00, wireframe: true });
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            ring.rotation.x = Math.PI / 2;
+            ring.position.set(b.x, topY + 2.5, b.z);
+            scene.add(ring);
+            checkpoints.push({ x: b.x, y: topY + 2.5, z: b.z, mesh: ring, hit: false });
+        });
+
+        // Distant Skyline filler buildings
+        for(let i = 0; i < 35; i++) {
+            const rx = (Math.random() - 0.5) * 500;
+            const rz = (Math.random() - 0.5) * 500;
+            if(Math.abs(rx) < 60 && Math.abs(rz) < 180) continue;
+            const rh = 30 + Math.random() * 90;
+            const bgGeo = new THREE.BoxGeometry(20 + Math.random()*20, rh, 20 + Math.random()*20);
+            const bgMat = new THREE.MeshLambertMaterial({ color: 0x414d5e });
+            const bgMesh = new THREE.Mesh(bgGeo, bgMat);
+            bgMesh.position.set(rx, rh / 2 - 20, rz);
+            scene.add(bgMesh);
+        }
+
+        /* ------------------------------------------------------------------
+           4. 3D CHARACTER MODEL RIGGING
+           ------------------------------------------------------------------ */
+        const player = {
+            group: new THREE.Group(),
+            velocity: new THREE.Vector3(),
+            pos: new THREE.Vector3(0, 42, 10),
+            speed: 0.35,
+            isGrounded: true,
+            isWallRunning: false,
+            isSliding: false,
+            rotationY: 0,
+            stats: CHARACTERS[0]
+        };
+
+        // Procedural Streetwear Character Mesh
+        let torso, head, leftLeg, rightLeg, leftArm, rightArm;
+
+        function buildPlayerModel() {
+            scene.remove(player.group);
+            player.group = new THREE.Group();
+
+            const c = player.stats;
+
+            // Torso / Oversized Hoodie
+            const torsoGeo = new THREE.BoxGeometry(1.2, 1.5, 0.8);
+            const torsoMat = new THREE.MeshLambertMaterial({ color: c.colorJacket });
+            torso = new THREE.Mesh(torsoGeo, torsoMat);
+            torso.position.y = 1.6;
+            torso.castShadow = true;
+            player.group.add(torso);
+
+            // Tactical Backpack
+            const packGeo = new THREE.BoxGeometry(0.8, 1.0, 0.45);
+            const packMat = new THREE.MeshLambertMaterial({ color: 0x222222 });
+            const pack = new THREE.Mesh(packGeo, packMat);
+            pack.position.set(0, 1.6, 0.55);
+            player.group.add(pack);
+
+            // Head & Cap
+            const headGeo = new THREE.SphereGeometry(0.42, 16, 16);
+            const headMat = new THREE.MeshLambertMaterial({ color: 0xd9a87e });
+            head = new THREE.Mesh(headGeo, headMat);
+            head.position.y = 2.6;
+            head.castShadow = true;
+            player.group.add(head);
+
+            // Legs / Cargo Pants
+            const legGeo = new THREE.BoxGeometry(0.4, 1.2, 0.45);
+            const legMat = new THREE.MeshLambertMaterial({ color: c.colorPants });
+
+            leftLeg = new THREE.Mesh(legGeo, legMat);
+            leftLeg.position.set(-0.35, 0.65, 0);
+            leftLeg.castShadow = true;
+            player.group.add(leftLeg);
+
+            rightLeg = new THREE.Mesh(legGeo, legMat);
+            rightLeg.position.set(0.35, 0.65, 0);
+            rightLeg.castShadow = true;
+            player.group.add(rightLeg);
+
+            // Arms
+            const armGeo = new THREE.BoxGeometry(0.32, 1.2, 0.35);
+            const armMat = new THREE.MeshLambertMaterial({ color: c.colorBody });
+
+            leftArm = new THREE.Mesh(armGeo, armMat);
+            leftArm.position.set(-0.85, 1.6, 0);
+            leftArm.castShadow = true;
+            player.group.add(leftArm);
+
+            rightArm = new THREE.Mesh(armGeo, armMat);
+            rightArm.position.set(0.85, 1.6, 0);
+            rightArm.castShadow = true;
+            player.group.add(rightArm);
+
+            player.group.position.copy(player.pos);
+            scene.add(player.group);
+        }
+
+        /* ------------------------------------------------------------------
+           5. INPUT HANDLING (Virtual Joystick + Keyboard Controls)
+           ------------------------------------------------------------------ */
+        const input = { forward: 0, right: 0, jump: false, slide: false, wallrun: false };
+
+        // Keyboard support (WASD + Space)
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'KeyW' || e.code === 'ArrowUp') input.forward = 1;
+            if (e.code === 'KeyS' || e.code === 'ArrowDown') input.forward = -1;
+            if (e.code === 'KeyA' || e.code === 'ArrowLeft') input.right = -1;
+            if (e.code === 'KeyD' || e.code === 'ArrowRight') input.right = 1;
+            if (e.code === 'Space') executeJump();
+            if (e.code === 'KeyC') executeSlide();
+            if (e.code === 'ShiftLeft') input.wallrun = true;
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (['KeyW', 'KeyS', 'ArrowUp', 'ArrowDown'].includes(e.code)) input.forward = 0;
+            if (['KeyA', 'KeyD', 'ArrowLeft', 'ArrowRight'].includes(e.code)) input.right = 0;
+            if (e.code === 'ShiftLeft') input.wallrun = false;
+        });
+
+        // Touch Joystick Logic
+        const joyZone = document.getElementById('joystick-zone');
+        const knob = document.getElementById('joystick-knob');
+        let touchOrigin = null;
+
+        joyZone.addEventListener('touchstart', (e) => {
+            const t = e.touches[0];
+            touchOrigin = { x: t.clientX, y: t.clientY };
+        }, { passive: false });
+
+        joyZone.addEventListener('touchmove', (e) => {
+            if (!touchOrigin) return;
+            const t = e.touches[0];
+            const dx = t.clientX - touchOrigin.x;
+            const dy = t.clientY - touchOrigin.y;
+            const dist = Math.min(Math.hypot(dx, dy), 45);
+            const angle = Math.atan2(dy, dx);
+
+            const kx = Math.cos(angle) * dist;
+            const ky = Math.sin(angle) * dist;
+            knob.style.transform = `translate(${kx}px, ${ky}px)`;
+
+            input.right = kx / 45;
+            input.forward = -ky / 45;
+        }, { passive: false });
+
+        const resetKnob = () => {
+            touchOrigin = null;
+            knob.style.transform = `translate(0px, 0px)`;
+            input.forward = 0;
+            input.right = 0;
+        };
+        joyZone.addEventListener('touchend', resetKnob);
+        joyZone.addEventListener('touchcancel', resetKnob);
+
+        // Mobile Buttons
+        document.getElementById('btn-jump').addEventListener('pointerdown', executeJump);
+        document.getElementById('btn-slide').addEventListener('pointerdown', executeSlide);
+        document.getElementById('btn-wallrun').addEventListener('pointerdown', () => {
+            showCombo("WALL RUN ENGAGED");
+            if (!player.isGrounded) player.velocity.y = 2.5;
+        });
+        document.getElementById('btn-roll').addEventListener('pointerdown', () => {
+            showCombo("SAFETY DIVE ROLL +150");
+            player.pos.y = Math.max(player.pos.y - 0.5, 0);
+        });
+
+        /* ------------------------------------------------------------------
+           6. PARKOUR ACTIONS & PHYSICS
+           ------------------------------------------------------------------ */
+        function executeJump() {
+            if (player.isGrounded) {
+                player.velocity.y = player.stats.jumpPower;
+                player.isGrounded = false;
+                showCombo("VAULT LEAP!");
+            }
+        }
+
+        function executeSlide() {
+            if (!player.isSliding) {
+                player.isSliding = true;
+                showCombo("POWER SLIDE");
+                torso.scale.set(1.2, 0.45, 0.8);
+                torso.position.y = 0.5;
+                setTimeout(() => {
+                    torso.scale.set(1.2, 1.5, 0.8);
+                    torso.position.y = 1.6;
+                    player.isSliding = false;
+                }, 750);
+            }
+        }
+
+        function showCombo(text) {
+            const banner = document.getElementById('combo-banner');
+            banner.innerText = text;
+            banner.style.opacity = '1';
+            clearTimeout(banner.timer);
+            banner.timer = setTimeout(() => banner.style.opacity = '0', 1200);
+        }
+
+        /* ------------------------------------------------------------------
+           7. MAIN GAME LOOP
+           ------------------------------------------------------------------ */
+        let gameActive = false;
+        let startTime = 0;
+
+        function startGame() {
+            const p = CHARACTERS[selectedCharIndex];
+            player.stats = p;
+            document.getElementById('hud-char-name').innerText = p.name;
+            document.getElementById('hud-char-role').innerText = p.role;
+            buildPlayerModel();
+
+            document.getElementById('select-screen').style.display = 'none';
+            gameActive = true;
+            startTime = performance.now();
+        }
+
+        const gravity = -32;
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = Math.min(clock.getDelta(), 0.1);
+
+            if (gameActive) {
+                // Update Time Display
+                const elapsed = (performance.now() - startTime) / 1000;
+                const m = Math.floor(elapsed / 60).toString().padStart(2, '0');
+                const s = (elapsed % 60).toFixed(1).padStart(4, '0');
+                document.getElementById('hud-timer').innerText = `${m}:${s}`;
+
+                // Checkpoints Ring Rotation & Hit Detection
+                checkpoints.forEach((cp, idx) => {
+                    cp.mesh.rotation.z += 0.02;
+                    if (!cp.hit && player.pos.distanceTo(new THREE.Vector3(cp.x, cp.y, cp.z)) < 6) {
+                        cp.hit = true;
+                        cp.mesh.material.color.setHex(0x00ff88);
+                        activeCheckpointIndex++;
+                        document.getElementById('hud-checkpoints').innerText = `${activeCheckpointIndex} / ${checkpoints.length}`;
+                        showCombo("CHECKPOINT REACHED!");
+                    }
+                });
+
+                // Movement Direction
+                const moveVec = new THREE.Vector3(input.right, 0, -input.forward);
+                if (moveVec.lengthSq() > 0.01) {
+                    moveVec.normalize();
+                    const targetAngle = Math.atan2(moveVec.x, moveVec.z);
+                    player.rotationY = targetAngle;
+
+                    const effectiveSpeed = player.stats.speedMultiplier * (player.isSliding ? 22 : 15);
+                    player.pos.x += moveVec.x * effectiveSpeed * delta;
+                    player.pos.z += moveVec.z * effectiveSpeed * delta;
+
+                    // Running Leg Animation
+                    const legFreq = performance.now() * 0.012;
+                    leftLeg.rotation.x = Math.sin(legFreq) * 0.6;
+                    rightLeg.rotation.x = -Math.sin(legFreq) * 0.6;
+                    leftArm.rotation.x = -Math.sin(legFreq) * 0.6;
+                    rightArm.rotation.x = Math.sin(legFreq) * 0.6;
+                } else {
+                    leftLeg.rotation.x = 0;
+                    rightLeg.rotation.x = 0;
+                    leftArm.rotation.x = 0;
+                    rightArm.rotation.x = 0;
+                }
+
+                // Vertical Gravity & Airborne State
+                player.velocity.y += gravity * delta;
+                player.pos.y += player.velocity.y * delta;
+
+                // Check Rooftop Collisions
+                player.isGrounded = false;
+                for (let obs of obstacles) {
+                    if (
+                        player.pos.x >= obs.minX && player.pos.x <= obs.maxX &&
+                        player.pos.z >= obs.minZ && player.pos.z <= obs.maxZ
+                    ) {
+                        if (player.pos.y <= obs.topY && player.pos.y >= obs.topY - 3.5) {
+                            player.pos.y = obs.topY;
+                            player.velocity.y = 0;
+                            player.isGrounded = true;
+                            break;
+                        }
+                    }
+                }
+
+                // Fall Reset (Respawn at start if fallen from skyscraper)
+                if (player.pos.y < -15) {
+                    player.pos.set(0, 44, 10);
+                    player.velocity.set(0, 0, 0);
+                    showCombo("MISSED JUMP - RESPAWNED");
+                }
+
+                // Smooth Model Update
+                player.group.position.copy(player.pos);
+                player.group.rotation.y = player.rotationY;
+
+                // Dynamic 3rd Person Follow Camera (Matches rooftop angles)
+                const camTargetPos = new THREE.Vector3(
+                    player.pos.x,
+                    player.pos.y + 4.8,
+                    player.pos.z + 10.5
+                );
+                camera.position.lerp(camTargetPos, 0.1);
+                camera.lookAt(player.pos.x, player.pos.y + 1.8, player.pos.z - 3);
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Initialize default view
+        camera.position.set(0, 46, 20);
+        camera.lookAt(0, 42, 0);
+        animate();
+    </script>
+</body>
+</html>
